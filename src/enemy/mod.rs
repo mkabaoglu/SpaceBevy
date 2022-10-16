@@ -113,7 +113,7 @@ fn enemy_movement_system(
         let (x_radius, y_radius) = formation.radius;
 
         let angle = formation.angle
-            + dir * formation.speed * TIME_STEP * (x_radius.min(y_radius) * PI / 2.);
+            + dir * formation.speed * TIME_STEP / (x_radius.min(y_radius) * PI / 2.);
         let x_dst = x_radius * angle.cos() + x_pivot;
         let y_dst = y_radius * angle.sin() + y_pivot;
 
