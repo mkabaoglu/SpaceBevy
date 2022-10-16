@@ -1,14 +1,20 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, time::FixedTimestep};
 
 use crate::{
     components::{FromPlayer, Laser, Movable, Player, SpriteSize, Velocity},
-    GameTextures, WinSize, BASE_SPEED, PLAYER_LASER_SIZE, PLAYER_SIZE, SPRITE_SCALE, TIME_STEP,
+    GameTextures, PlayerState, WinSize, BASE_SPEED, PLAYER_LASER_SIZE, PLAYER_RESPAWN_DELAY,
+    PLAYER_SIZE, SPRITE_SCALE, TIME_STEP,
 };
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system_to_stage(StartupStage::PostStartup, player_spawn_sytem)
+        app.insert_resource(PlayerState::default())
+            .add_system_set(
+                SystemSet::new()
+                    .with_run_criteria(FixedTimestep::step(0.5))
+                    .with_system(player_spawn_sytem),
+            )
             .add_system(player_keyboard_event_system)
             .add_system(player_fire_system);
     }
@@ -16,27 +22,39 @@ impl Plugin for PlayerPlugin {
 
 fn player_spawn_sytem(
     mut commands: Commands,
+    mut player_state: ResMut<PlayerState>,
+    time: Res<Time>,
     game_textures: Res<GameTextures>,
     win_size: Res<WinSize>,
 ) {
-    //add rust crab
-    let bottom = -win_size.h / 2.;
-    commands
-        .spawn_bundle(SpriteBundle {
-            texture: game_textures.player.clone(),
-            transform: Transform {
-                translation: Vec3::new(0., bottom + PLAYER_SIZE.1 / 2. * SPRITE_SCALE + 5., 10.),
-                scale: Vec3::new(SPRITE_SCALE, SPRITE_SCALE, 1.),
+    let now = time.seconds_since_startup();
+    let last_shot = player_state.last_shot;
+
+    if !player_state.on && (last_shot == -1. || now > last_shot + PLAYER_RESPAWN_DELAY) {
+        //add rust crab
+        let bottom = -win_size.h / 2.;
+        commands
+            .spawn_bundle(SpriteBundle {
+                texture: game_textures.player.clone(),
+                transform: Transform {
+                    translation: Vec3::new(
+                        0.,
+                        bottom + PLAYER_SIZE.1 / 2. * SPRITE_SCALE + 5.,
+                        10.,
+                    ),
+                    scale: Vec3::new(SPRITE_SCALE, SPRITE_SCALE, 1.),
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(SpriteSize::from(PLAYER_SIZE))
-        .insert(Player)
-        .insert(Movable {
-            auto_despawn: false,
-        })
-        .insert(Velocity { x: 0.0, y: 0.0 });
+            })
+            .insert(SpriteSize::from(PLAYER_SIZE))
+            .insert(Player)
+            .insert(Movable {
+                auto_despawn: false,
+            })
+            .insert(Velocity { x: 0.0, y: 0.0 });
+        player_state.spawned();
+    }
 }
 
 fn player_keyboard_event_system(
